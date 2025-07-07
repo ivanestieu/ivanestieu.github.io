@@ -2,38 +2,50 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
-
-env:
-  GIT_AUTHOR_NAME: github-actions[bot]
-  GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
-  GIT_COMMITTER_NAME: github-actions[bot]
-  GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
-  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    branches:
+      - main
 
 jobs:
   build:
-
+    name: Build
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+
+      - name: Install dependencies
+        uses: bahmutov/npm-install@v1
+
+      - name: Build project
+        run: npm run build
+
+      - name: Upload production-ready build files
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-files
+          path: ./dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: npm ci
-    - run: npm run build --if-present
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: production-files
+          path: ./dist
 
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
 
-    - name: Deploy to GitHub Pages
-      if: github.ref == 'refs/heads/master' && matrix.node-version == '22.x'
-      run: npm run deploy
 
